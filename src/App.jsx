@@ -237,6 +237,47 @@ export default function App() {
     setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) } } : n)))
   }, [run, models, saveModel, setNodes])
 
+  // ---------- canvas background drop → image node ----------
+  const onDragOver = useCallback((e) => {
+    if (e.dataTransfer.types.includes('Files')) {
+      e.preventDefault()
+      e.dataTransfer.dropEffect = 'copy'
+    }
+  }, [])
+
+  const onDrop = useCallback(async (e) => {
+    const files = Array.from(e.dataTransfer.files || []).filter((f) => f.type.startsWith('image/'))
+    if (files.length === 0) return
+    e.preventDefault()
+
+    // 스크린 좌표 → 캔버스 좌표
+    const bounds = e.currentTarget.getBoundingClientRect()
+    const dropX = e.clientX - bounds.left
+    const dropY = e.clientY - bounds.top
+
+    for (const [i, file] of files.entries()) {
+      const dataUrl = await new Promise((res) => {
+        const fr = new FileReader()
+        fr.onload = () => res(fr.result)
+        fr.readAsDataURL(file)
+      })
+      const r = await fetch('/api/upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ dataUrl })
+      })
+      const j = await r.json()
+      if (!j.url) continue
+      const id = nid('img')
+      setNodes((ns) => [...ns, {
+        id,
+        type: 'image',
+        position: { x: dropX + i * 240, y: dropY },
+        data: { file: j.file, url: j.url }
+      }])
+    }
+  }, [setNodes])
+
   return (
     <>
       <div className="topbar">
@@ -262,6 +303,8 @@ export default function App() {
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
+          onDragOver={onDragOver}
+          onDrop={onDrop}
           deleteKeyCode={['Delete', 'Backspace']}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{ type: 'default' }}
