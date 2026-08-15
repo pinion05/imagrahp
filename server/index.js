@@ -15,31 +15,40 @@ app.use(express.json({ limit: '64mb' }))
 app.use(express.static(path.join(ROOT, 'dist')))
 
 // ---------- settings ----------
-function readSettings() {
+function readStored() {
   try { return JSON.parse(fs.readFileSync(SETTINGS_FILE, 'utf8')) }
   catch { return {} }
 }
-function writeSettings(s) {
+function writeStored(s) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2))
+}
+// 배포 시 환경변수로 미리 삽입 가능 (UI 저장값이 우선, 없으면 env fallback)
+function effectiveSettings() {
+  const s = readStored()
+  return {
+    ...s,
+    model: s.model || process.env.OPENROUTER_MODEL || null,
+    openrouterKey: s.openrouterKey || process.env.OPENROUTER_API_KEY || null
+  }
 }
 
 app.get('/api/settings', (_req, res) => {
-  const s = readSettings()
-  const hasKey = Boolean(s.openrouterKey)
-  res.json({ model: s.model || null, hasKey })
+  const s = effectiveSettings()
+  res.json({ model: s.model, hasKey: Boolean(s.openrouterKey) })
 })
 
 app.post('/api/settings', (req, res) => {
-  const s = readSettings()
+  const s = readStored()
   if (typeof req.body.model === 'string') s.model = req.body.model
   if (typeof req.body.openrouterKey === 'string') s.openrouterKey = req.body.openrouterKey
-  writeSettings(s)
-  res.json({ ok: true, model: s.model || null, hasKey: Boolean(s.openrouterKey) })
+  writeStored(s)
+  const e = effectiveSettings()
+  res.json({ ok: true, model: e.model, hasKey: Boolean(e.openrouterKey) })
 })
 
 // ---------- image models (with pricing) ----------
 app.get('/api/models', async (_req, res) => {
-  const s = readSettings()
+  const s = effectiveSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
   try {
     const [modelsRes] = await Promise.all([
@@ -106,7 +115,7 @@ app.get('/files/:name', (req, res) => {
 const MAX_RETRIES = 3
 
 app.post('/api/generate', async (req, res) => {
-  const s = readSettings()
+  const s = effectiveSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
   if (!s.model) return res.status(400).json({ error: '모델이 선택되지 않았습니다' })
   const { prompt, referenceFile } = req.body
@@ -165,4 +174,4 @@ app.post('/api/generate', async (req, res) => {
   res.status(502).json({ ok: false, error: `자동 재시도 ${MAX_RETRIES}회 소진 — ${lastErr}`, attempts: MAX_RETRIES })
 })
 
-app.listen(PORT, () => console.log(`node/forge server on :${PORT}`))
+app.listen(PORT, () => console.log(`nodegrahp server on :${PORT}`))

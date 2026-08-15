@@ -57,7 +57,7 @@ export default function App() {
   const loadSettings = useCallback(async () => {
     const r = await fetch('/api/settings')
     const j = await r.json()
-    setSettings(j)
+    setSettings({ ...j, loaded: true })
     if (j.model) patchNode('model_1', { model: j.model })
   }, [patchNode])
 
@@ -149,20 +149,17 @@ export default function App() {
   // We keep domain rule "단일 삭제, 연쇄 없음": we intercept via onNodesDelete to keep other nodes.
   // Edges attached to the deleted node are removed (they must be — they point at nothing), but no OTHER nodes are deleted.
 
+  // 설정이 비어있으면(키/모델 없음) 패널 자동 오픈 — 호스팅 시 키 먼저 삽입 유도
+  useEffect(() => {
+    if (settings.loaded && !settings.hasKey) setPanelOpen(true)
+  }, [settings.loaded, settings.hasKey])
+
   // ---------- settings ----------
   const saveModel = useCallback(async (model) => {
     setSettings((s) => ({ ...s, model }))
     patchNode('model_1', { model })
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) })
   }, [patchNode])
-
-  const saveKey = useCallback(async () => {
-    if (!apiKeyInput.trim()) return
-    await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openrouterKey: apiKeyInput.trim() }) })
-    setApiKeyInput('')
-    await loadSettings()
-    toast(true, 'API 키 저장됨 (로컬)')
-  }, [apiKeyInput, loadSettings, toast])
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -176,12 +173,21 @@ export default function App() {
     }
   }, [toast])
 
+  const saveKey = useCallback(async () => {
+    if (!apiKeyInput.trim()) return
+    await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ openrouterKey: apiKeyInput.trim() }) })
+    setApiKeyInput('')
+    await loadSettings()
+    toast(true, 'API 키 저장됨 (로컬)')
+    loadModels()
+  }, [apiKeyInput, loadSettings, loadModels, toast])
+
   useEffect(() => { if (panelOpen) loadModels() }, [panelOpen]) // eslint-disable-line
 
   return (
     <>
       <div className="topbar">
-        <div className="logo">node<span className="dim">/</span>forge</div>
+        <div className="logo">node<span className="dim">/</span>grahp</div>
         <div className="tb-sep" />
         <div className="tb-item">
           <span className={`dot ${settings.model && settings.hasKey ? '' : 'off'}`} />
@@ -224,6 +230,16 @@ export default function App() {
               <div className="x" onClick={() => setPanelOpen(false)}>✕</div>
             </div>
             <div className="field">
+              <div className="lab">OPENROUTER API KEY {settings.hasKey && '· ✓ 저장됨'}</div>
+              <input
+                type="password"
+                placeholder={settings.hasKey ? 'sk-or-v1-•••• (저장됨 — 재입력 시 교체)' : 'sk-or-v1-…'}
+                value={apiKeyInput}
+                onChange={(e) => setApiKeyInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && saveKey()}
+              />
+            </div>
+            <div className="field">
               <div className="lab">MODEL · 전역 1개 {models.length > 0 && `· ${models.length}개 · 저가순`}</div>
               {models.length === 0 ? (
                 <div className="list-status">
@@ -251,18 +267,8 @@ export default function App() {
                 </div>
               )}
             </div>
-            <div className="field">
-              <div className="lab">OPENROUTER API KEY</div>
-              <input
-                type="password"
-                placeholder={settings.hasKey ? 'sk-or-v1-•••• (저장됨)' : 'sk-or-v1-…'}
-                value={apiKeyInput}
-                onChange={(e) => setApiKeyInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && saveKey()}
-              />
-            </div>
             <div className="hint">
-              // 키는 로컬(.data/settings.json)에만 저장됩니다<br />
+              // 키는 로컬(.data/settings.json)에만 저장 · 환경변수 OPENROUTER_API_KEY / OPENROUTER_MODEL로 사전 설정 가능<br />
               // 모델 변경 시 새 생성부터 적용
             </div>
           </div>
