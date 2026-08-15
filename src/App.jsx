@@ -281,7 +281,7 @@ export default function App() {
   return (
     <>
       <div className="topbar">
-        <div className="logo">ima<span className="dim">/</span>graph</div>
+        <div className="logo">imagraph</div>
         <div className="tb-sep" />
         <div className="tb-item">
           <span className={`dot ${settings.model && settings.hasKey ? '' : 'off'}`} />
