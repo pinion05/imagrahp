@@ -126,7 +126,7 @@ export function ImageNode({ id, data, selected }) {
             ✎
           </button>
         )}
-        <div className="nf-tag">{data.tag || 'SRC'}</div>
+        <div className="nf-tag">{data.status === 'err' ? (data.tag || '실패') : 'SRC'}</div>
       </div>
       <div
         className={`nf-thumb ${editMode ? 'editing' : ''}`}
@@ -138,7 +138,9 @@ export function ImageNode({ id, data, selected }) {
       >
         {data.url
           ? <img src={data.url} alt="" draggable={false} />
-          : <div className={`dropzone ${over ? 'over' : ''}`}>DROP IMAGE<br />또는 클릭해서 업로드</div>}
+          : data.status === 'running'
+            ? <div className="dropzone">생성 중…</div>
+            : <div className={`dropzone ${over ? 'over' : ''}`}>DROP IMAGE<br />또는 클릭해서 업로드</div>}
         {editMode && (
           <canvas
             ref={canvasRef}
@@ -221,34 +223,9 @@ export function ModelNode({ id, data, selected }) {
   )
 }
 
-export function ResultNode({ id, data, selected }) {
-  return (
-    <div className={`nf-node ${selected ? 'selected' : ''}`}>
-      <div className="nf-head">
-        <div className="nf-icon" />
-        <input
-          className="nodrag nf-title-input"
-          value={data.title || ''}
-          placeholder="이름 (예: 결과1)"
-          onChange={(e) => window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { title: e.target.value } } }))}
-        />
-        <div className="nf-tag">{data.tag || ''}</div>
-      </div>
-      <div className="nf-thumb">
-        {data.status === 'running' && <div className="dropzone">생성 중…</div>}
-        {data.url && <img src={data.url} alt="" draggable={false} />}
-      </div>
-      {data.status && (
-        <div className={`nf-status ${data.status === 'ok' ? 'ok' : data.status === 'err' ? 'err' : 'warn'}`}>
-          <span className="sdot" />
-          {data.statusText}
-        </div>
-      )}
-      {data.meta && <div className="nf-meta">{data.meta}</div>}
-      <Handle type="target" position={Position.Left} id="in" />
-      <Handle type="source" position={Position.Right} id="out" />
-    </div>
-  )
+// 결과 노드 = 이미지 노드와 동일 (생성 결과는 일반 이미지 노드 취급)
+export function ResultNode(props) {
+  return ImageNode(props)
 }
 
 export const nodeTypes = {

@@ -16,6 +16,12 @@ const nid = (p) => `${p}_${nextId++}`
 
 const fmtPrice = (p) => (p >= 1 ? p.toFixed(2) : p >= 0.01 ? p.toFixed(3) : p.toFixed(5))
 
+// 제외할 data 키 (함수/리소스는 새 노드에 재주입됨)
+const cloneData = (d) => {
+  const { run, models, onModelChange, onOpenSettings, ...rest } = d || {}
+  return structuredClone(rest)
+}
+
 const initialNodes = [
   { id: 'img_1', type: 'image', position: { x: 80, y: 140 }, data: {} },
   { id: 'prompt_1', type: 'prompt', position: { x: 80, y: 460 }, data: { prompt: '' } },
@@ -117,12 +123,11 @@ export default function App() {
     while (occupied.has(`${Math.floor(slot % COLS)}:${Math.floor(slot / COLS)}`) && slot < COLS * 8) slot++
     const slotX = modelPos.x + 380 + (slot % COLS) * GAP_X
     const slotY = TOP + Math.floor(slot / COLS) * GAP_Y
-    const totalResults = ns.filter((n) => n.type === 'result').length + 1
     const resultNode = {
       id: resultId,
       type: 'result',
       position: { x: slotX, y: slotY },
-      data: { status: 'running', statusText: '생성 중…', tag: `v${totalResults}` }
+      data: { status: 'running' }
     }
     setNodes((cur) => [...cur, resultNode])
     setEdges((cur) => [...cur, { id: `e_${resultId}`, source: modelNode.id, sourceHandle: 'out', target: resultId, targetHandle: 'in' }])
@@ -136,14 +141,14 @@ export default function App() {
       })
       const j = await r.json()
       if (j.ok) {
-        patchNode(resultId, { url: j.url, file: j.file, status: 'ok', statusText: '생성 완료', meta: `${new Date().toLocaleTimeString('ko-KR')} · 로컬 저장됨` })
+        patchNode(resultId, { url: j.url, file: j.file, status: null })
         toast(true, `생성 완료 — ${j.attempts > 1 ? `재시도 ${j.attempts - 1}회 후 성공` : '1회 성공'}`)
       } else {
-        patchNode(resultId, { status: 'err', statusText: '실패', meta: j.error?.slice(0, 60) })
+        patchNode(resultId, { status: 'err', tag: '실패' })
         toast(false, j.error || '생성 실패')
       }
     } catch (e) {
-      patchNode(resultId, { status: 'err', statusText: '실패', meta: String(e).slice(0, 60) })
+      patchNode(resultId, { status: 'err', tag: '실패' })
       toast(false, '서버 오류')
     } finally {
       patchNode(modelNode.id, { running: false })
@@ -278,6 +283,66 @@ export default function App() {
     }
   }, [setNodes])
 
+  // ---------- Ctrl+C / Ctrl+V 노드 복붙 ----------
+  const clipboardRef = useRef(null) // { nodes: [...], edges: [...] }
+
+  const onCopy = useCallback(() => {
+    const { nodes: ns, edges: es } = stateRef.current
+    const sel = ns.filter((n) => n.selected)
+    if (sel.length === 0) return
+    const ids = new Set(sel.map((n) => n.id))
+    const innerEdges = es.filter((e) => ids.has(e.source) && ids.has(e.target))
+    clipboardRef.current = {
+      nodes: sel.map((n) => ({ id: n.id, type: n.type, position: { ...n.position }, data: cloneData(n.data) })),
+      edges: innerEdges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle, targetHandle: e.targetHandle }))
+    }
+  }, [])
+
+  const onPaste = useCallback(() => {
+    const clip = clipboardRef.current
+    if (!clip || clip.nodes.length === 0) return
+    const idMap = {}
+    const newNodes = clip.nodes.map((n) => {
+      const id = nid(n.type === 'image' ? 'img' : n.type === 'prompt' ? 'prompt' : n.type === 'model' ? 'model' : 'result')
+      idMap[n.id] = id
+      return {
+        id,
+        type: n.type,
+        position: { x: n.position.x + 40, y: n.position.y + 40 },
+        data: { ...n.data },
+        selected: true
+      }
+    })
+    const newEdges = clip.edges.map((e) => ({
+      id: `e_${idMap[e.source]}_${Date.now()}_${Math.random().toString(36).slice(2, 5)}`,
+      source: idMap[e.source],
+      target: idMap[e.target],
+      sourceHandle: e.sourceHandle,
+      targetHandle: e.targetHandle
+    }))
+    setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), ...newNodes])
+    setEdges((es) => [...es, ...newEdges])
+  }, [setNodes, setEdges])
+
+  // 전역 키보드 핸들러 (입력 필드 포커스 시 제외)
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!(e.ctrlKey || e.metaKey)) return
+      const key = e.key.toLowerCase()
+      const tag = document.activeElement?.tagName
+      const inField = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || document.activeElement?.isContentEditable
+      if (key === 'c' && !inField) { onCopy() }
+      else if (key === 'v' && !inField) { onPaste() }
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onCopy, onPaste])
+
+  // 붙여넣은 모델 노드에 run/handlers 재주입 (노드 수 변화 감지)
+  useEffect(() => {
+    setNodes((ns) => ns.map((n) => (n.type === 'model' && !n.data.run ? { ...n, data: { ...n.data, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) } } : n)))
+  }, [nodes.length]) // eslint-disable-line
+
   return (
     <>
       <div className="topbar">
@@ -306,6 +371,9 @@ export default function App() {
           onDragOver={onDragOver}
           onDrop={onDrop}
           deleteKeyCode={['Delete', 'Backspace']}
+          multiSelectionKeyCode={['Shift', 'Meta']}
+          selectionOnDrag
+          panOnDrag={[1, 2]}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{ type: 'default' }}
         >
