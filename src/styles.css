@@ -142,7 +142,36 @@ body {
   position: relative;
   background: #050505;
 }
-.nf-thumb img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.nf-thumb img { width: 100%; height: 100%; object-fit: contain; display: block; }
+.nf-thumb.editing { outline: 1px solid rgba(255, 51, 102, 0.5); outline-offset: 2px; }
+.nf-draw-canvas {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  cursor: crosshair;
+  touch-action: none;
+}
+.nf-edit-btn {
+  background: transparent;
+  border: 1px solid var(--line-color);
+  border-radius: 4px;
+  color: var(--text-dim);
+  font-size: 11px;
+  width: 22px; height: 22px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  flex-shrink: 0;
+}
+.nf-edit-btn:hover { color: #fff; border-color: var(--line-hover); }
+.nf-edit-btn.on { color: #ff3366; border-color: rgba(255, 51, 102, 0.6); background: rgba(255, 51, 102, 0.1); }
+.nf-edit-hint {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dark);
+  padding: 0 10px 8px;
+  letter-spacing: 0.04em;
+}
 .nf-thumb .dropzone {
   position: absolute; inset: 0;
   display: flex; flex-direction: column; gap: 8px;
