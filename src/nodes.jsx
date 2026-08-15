@@ -74,10 +74,25 @@ export function ModelNode({ id, data, selected }) {
         <div className="nf-tag">GEN</div>
       </div>
       <div className="nf-model-body">
-        <div className="nf-model-name">
-          <span>{data.model || '(미설정)'}</span>
-          <span className="lock">⚿ 전역</span>
-        </div>
+        {data.models && data.models.length > 0 ? (
+          <select
+            className="nf-model-select"
+            value={data.model || ''}
+            onChange={(e) => data.onModelChange?.(e.target.value)}
+          >
+            <option value="">— 모델 선택 —</option>
+            {data.models.map((m) => (
+              <option key={m.id} value={m.id}>
+                {m.id}{m.price != null ? ` · ${m.priceUnit === 'token' ? `$${m.price}/1k tok` : `$${m.price}/img`}` : ''}
+              </option>
+            ))}
+          </select>
+        ) : (
+          <div className="nf-model-name" onClick={() => data.onOpenSettings?.()}>
+            <span>{data.model || '(미설정)'}</span>
+            <span className="lock">⚙ 설정</span>
+          </div>
+        )}
         <div className="nf-port-row"><span>in · image / prompt</span><span className="v">1</span></div>
         <div className="nf-port-row"><span>out · image</span><span className="v">→</span></div>
         <button className="nf-run" onClick={onRun} disabled={data.running}>

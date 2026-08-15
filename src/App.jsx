@@ -122,18 +122,13 @@ export default function App() {
     }
   }, [patchNode, setNodes, setEdges, toast])
 
-  // inject run into model nodes
-  useEffect(() => {
-    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run } } : n)))
-  }, [run, setNodes])
-
   // ---------- add nodes ----------
   const addNode = useCallback((type) => {
     const id = nid(type === 'image' ? 'img' : type === 'prompt' ? 'prompt' : 'model')
     const dataMap = {
       image: {},
       prompt: { prompt: '' },
-      model: { model: settings.model, run }
+      model: { model: settings.model, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) }
     }
     setNodes((ns) => [...ns, {
       id, type,
@@ -161,9 +156,10 @@ export default function App() {
   // ---------- settings ----------
   const saveModel = useCallback(async (model) => {
     setSettings((s) => ({ ...s, model }))
-    patchNode('model_1', { model })
+    // 전역 1모델: 모든 모델 노드에 즉시 전파
+    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, model } } : n)))
     await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) })
-  }, [patchNode])
+  }, [setNodes])
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -187,6 +183,20 @@ export default function App() {
   }, [apiKeyInput, loadSettings, loadModels, toast])
 
   useEffect(() => { if (panelOpen) loadModels() }, [panelOpen]) // eslint-disable-line
+
+  // 키가 있으면 패널 안 열어도 모델 목록 미리 로드 (노드 드롭다운용) — 선언 후 호출
+  const preloadedRef = useRef(false)
+  useEffect(() => {
+    if (settings.loaded && settings.hasKey && !preloadedRef.current) {
+      preloadedRef.current = true
+      loadModels()
+    }
+  }, [settings.loaded, settings.hasKey]) // eslint-disable-line
+
+  // inject run + model list/handlers into model nodes (선언 이후 위치)
+  useEffect(() => {
+    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) } } : n)))
+  }, [run, models, saveModel, setNodes])
 
   return (
     <>

@@ -192,6 +192,21 @@ body {
   gap: 12px;
 }
 .nf-model-name .lock { color: var(--text-dark); font-size: 10px; }
+.nf-model-select {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #e8e8e8;
+  background: rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 5px;
+  padding: 7px 8px;
+  outline: none;
+  cursor: pointer;
+  max-width: 220px;
+}
+.nf-model-select:hover { border-color: rgba(255, 255, 255, 0.3); }
+.nf-model-select option { background: #0a0a0a; color: #ddd; }
+.nf-model-name { cursor: pointer; }
 .nf-port-row {
   display: flex;
   justify-content: space-between;
