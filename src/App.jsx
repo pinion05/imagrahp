@@ -81,11 +81,28 @@ export default function App() {
     const prompt = filled.map((n) => n.data.prompt.trim()).join('\n')
 
     // reference images: ALL image/result nodes with files connected INTO the model
-    const imgFiles = sources
-      .filter((n) => (n.type === 'image' || n.type === 'result') && n.data.file)
-      .map((n) => n.data.file)
-    const referenceFiles = imgFiles.slice(0, 10) // OpenRouter 참조 이미지 상한
-    if (imgFiles.length > 10) toast(false, `참조 이미지 ${imgFiles.length}개 중 첫 10개만 전송됩니다`)
+    const imgSources = sources.filter((n) => (n.type === 'image' || n.type === 'result') && n.data.file)
+    // 이름 언급 순서로 정렬: 프롬프트에 먼저 언급된 캐릭터가 첫 참조가 되도록
+    const named = imgSources.filter((n) => (n.data.title || '').trim())
+    const sorted = [...imgSources].sort((a, b) => {
+      const ia = prompt.indexOf((a.data.title || '').trim())
+      const ib = prompt.indexOf((b.data.title || '').trim())
+      if (ia === -1 && ib === -1) return 0
+      if (ia === -1) return 1
+      if (ib === -1) return -1
+      return ia - ib
+    })
+    const referenceFiles = sorted.slice(0, 10).map((n) => n.data.file)
+    if (imgSources.length > 10) toast(false, `참조 이미지 ${imgSources.length}개 중 첫 10개만 전송됩니다`)
+
+    // 이름 매핑 안내: 모델이 참조 이미지와 이름을 연결하도록 프롬프트 뒤에 부가 (이름 있는 노드가 있을 때만)
+    let finalPrompt = prompt
+    const refCount = referenceFiles.length
+    const namedOrdered = sorted.slice(0, 10).filter((n) => (n.data.title || '').trim())
+    if (namedOrdered.length > 0) {
+      const lines = namedOrdered.map((n, i) => `참조 이미지 ${i + 1}: "${(n.data.title || '').trim()}"`)
+      finalPrompt = `${prompt}\n\n[참조 이미지 안내 — 입력 순서대로]\n${lines.join('\n')}`
+    }
 
     // create result node hooked to model output
     const resultId = nid('result')
@@ -105,7 +122,7 @@ export default function App() {
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, referenceFiles })
+        body: JSON.stringify({ prompt: finalPrompt, referenceFiles })
       })
       const j = await r.json()
       if (j.ok) {

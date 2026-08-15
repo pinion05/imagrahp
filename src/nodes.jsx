@@ -24,7 +24,12 @@ export function ImageNode({ id, data, selected }) {
     <div className={`nf-node ${selected ? 'selected' : ''}`}>
       <div className="nf-head">
         <div className="nf-icon" />
-        <div className="nf-title">{data.title || '이미지'}</div>
+        <input
+          className="nodrag nf-title-input"
+          value={data.title || ''}
+          placeholder="이름 (예: 제임스)"
+          onChange={(e) => window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { title: e.target.value } } }))}
+        />
         <div className="nf-tag">{data.tag || 'SRC'}</div>
       </div>
       <div
@@ -111,7 +116,12 @@ export function ResultNode({ id, data, selected }) {
     <div className={`nf-node ${selected ? 'selected' : ''}`}>
       <div className="nf-head">
         <div className="nf-icon" />
-        <div className="nf-title">결과</div>
+        <input
+          className="nodrag nf-title-input"
+          value={data.title || ''}
+          placeholder="이름 (예: 결과1)"
+          onChange={(e) => window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { title: e.target.value } } }))}
+        />
         <div className="nf-tag">{data.tag || ''}</div>
       </div>
       <div className="nf-thumb">
