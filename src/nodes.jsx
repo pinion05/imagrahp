@@ -126,7 +126,7 @@ export function ImageNode({ id, data, selected }) {
             ✎
           </button>
         )}
-        <div className="nf-tag">{data.status === 'err' ? (data.tag || '실패') : 'SRC'}</div>
+        {data.status === 'err' && <div className="nf-tag">{data.tag || '실패'}</div>}
       </div>
       <div
         className={`nf-thumb ${editMode ? 'editing' : ''}`}
@@ -156,6 +156,7 @@ export function ImageNode({ id, data, selected }) {
         <input ref={inputRef} type="file" accept="image/*" hidden onChange={(e) => upload(e.target.files[0])} />
       </div>
       {editMode && <div className="nf-edit-hint">✎ 브러시로 그린 후 ✎ 클릭 → 이미지에 합성</div>}
+      <Handle type="target" position={Position.Left} id="in" />
       <Handle type="source" position={Position.Right} id="out" />
     </div>
   )

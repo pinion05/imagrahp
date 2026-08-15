@@ -177,7 +177,7 @@ export default function App() {
     const tgt = ns.find((n) => n.id === conn.target)
     if (!src || !tgt) return false
     // 허용: (이미지|프롬프트|결과)→모델, 모델→결과
-    if (src.type === 'model') return tgt.type === 'result'
+    if (src.type === 'model') return tgt.type === 'result' || tgt.type === 'image'
     if (tgt.type === 'model') return ['image', 'prompt', 'result'].includes(src.type)
     return false
   }, [])
