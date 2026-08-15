@@ -123,23 +123,24 @@ app.post('/api/generate', async (req, res) => {
   const s = effectiveSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
   if (!s.model) return res.status(400).json({ error: '모델이 선택되지 않았습니다' })
-  const { prompt, referenceFile } = req.body
+  const { prompt, referenceFiles } = req.body
   if (!prompt) return res.status(400).json({ error: '프롬프트가 비었습니다' })
 
-  let referenceUrl = null
-  if (referenceFile) {
-    const p = path.join(IMAGES_DIR, path.basename(referenceFile))
-    if (fs.existsSync(p)) {
+  const referenceUrls = (Array.isArray(referenceFiles) ? referenceFiles : referenceFiles ? [referenceFiles] : [])
+    .slice(0, 10)
+    .flatMap((f) => {
+      const p = path.join(IMAGES_DIR, path.basename(String(f)))
+      if (!fs.existsSync(p)) return []
       const b64 = fs.readFileSync(p).toString('base64')
       const ext = p.endsWith('.png') ? 'png' : p.endsWith('.webp') ? 'webp' : 'jpeg'
-      referenceUrl = `data:image/${ext};base64,${b64}`
-    }
-  }
+      return [{ type: 'image_url', image_url: { url: `data:image/${ext};base64,${b64}` } }]
+    })
+  console.log(`[generate] prompt ${prompt.length}자 · 참조 ${referenceUrls.length}장 → ${s.model}`)
 
   const body = {
     model: s.model,
     prompt,
-    ...(referenceUrl ? { input_references: [{ type: 'image_url', image_url: { url: referenceUrl } }] } : {})
+    ...(referenceUrls.length > 0 ? { input_references: referenceUrls } : {})
   }
 
   let lastErr = null

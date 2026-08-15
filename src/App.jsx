@@ -71,20 +71,21 @@ export default function App() {
     const modelNode = ns.find((n) => n.id === modelNodeId)
     if (!modelNode || modelNode.type !== 'model') return
 
-    // upstream prompt: prompt node connected into this model
+    // upstream prompts: ALL prompt nodes connected into this model (순서 유지, 결합)
     const inEdges = es.filter((e) => e.target === modelNode.id)
-    const promptNode = inEdges
-      .map((e) => ns.find((n) => n.id === e.source))
-      .find((n) => n?.type === 'prompt')
-    if (!promptNode) { toast(false, '프롬프트 노드가 연결되지 않았습니다'); return }
-    const prompt = promptNode.data.prompt || ''
-    if (!prompt.trim()) { toast(false, '프롬프트가 비었습니다'); return }
+    const sources = inEdges.map((e) => ns.find((n) => n.id === e.source)).filter(Boolean)
+    const promptNodes = sources.filter((n) => n.type === 'prompt')
+    if (promptNodes.length === 0) { toast(false, '프롬프트 노드가 연결되지 않았습니다'); return }
+    const filled = promptNodes.filter((n) => (n.data.prompt || '').trim())
+    if (filled.length === 0) { toast(false, '프롬프트가 비었습니다'); return }
+    const prompt = filled.map((n) => n.data.prompt.trim()).join('\n')
 
-    // reference image: any image/result node connected INTO the model node
-    const imgNode = inEdges
-      .map((e) => ns.find((n) => n.id === e.source))
-      .find((n) => (n?.type === 'image' || n?.type === 'result') && n?.data?.file)
-    const referenceFile = imgNode?.data?.file || null
+    // reference images: ALL image/result nodes with files connected INTO the model
+    const imgFiles = sources
+      .filter((n) => (n.type === 'image' || n.type === 'result') && n.data.file)
+      .map((n) => n.data.file)
+    const referenceFiles = imgFiles.slice(0, 10) // OpenRouter 참조 이미지 상한
+    if (imgFiles.length > 10) toast(false, `참조 이미지 ${imgFiles.length}개 중 첫 10개만 전송됩니다`)
 
     // create result node hooked to model output
     const resultId = nid('result')
@@ -104,7 +105,7 @@ export default function App() {
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt, referenceFile })
+        body: JSON.stringify({ prompt, referenceFiles })
       })
       const j = await r.json()
       if (j.ok) {
@@ -137,11 +138,22 @@ export default function App() {
     }])
   }, [setNodes, settings.model, run])
 
-  // ---------- connect ----------
+  // ---------- connect (유효 연결만) ----------
+  const isValidConnection = useCallback((conn) => {
+    const { nodes: ns } = stateRef.current
+    const src = ns.find((n) => n.id === conn.source)
+    const tgt = ns.find((n) => n.id === conn.target)
+    if (!src || !tgt) return false
+    // 허용: (이미지|프롬프트|결과)→모델, 모델→결과
+    if (src.type === 'model') return tgt.type === 'result'
+    if (tgt.type === 'model') return ['image', 'prompt', 'result'].includes(src.type)
+    return false
+  }, [])
+
   const onConnect = useCallback((params) => {
-    // only allow logical connections: image/prompt/result → model(image/prompt), model → result, result → model(image)
-    setEdges((es) => addEdge({ ...params, animated: false }, es))
-  }, [setEdges])
+    if (!isValidConnection(params)) return
+    setEdges((es) => addEdge({ ...params }, es))
+  }, [setEdges, isValidConnection])
 
   // ---------- delete single node (no cascade) ----------
   // React Flow default: deleting node keeps its edges? No — it removes connected edges.
