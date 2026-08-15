@@ -120,7 +120,6 @@ export function ImageNode({ id, data, selected }) {
   return (
     <div className={`nf-node ${selected ? 'selected' : ''}`}>
       <div className="nf-head">
-        <div className="nf-icon" />
         <input
           className="nodrag nf-title-input"
           value={data.title || ''}
