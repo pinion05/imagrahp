@@ -204,9 +204,14 @@ export function ModelNode({ id, data, selected }) {
       <div className="nf-model-body">
         {data.models && data.models.length > 0 ? (
           <select
-            className="nf-model-select"
+            className="nf-model-select nodrag"
             value={data.model || ''}
-            onChange={(e) => data.onModelChange?.(e.target.value)}
+            onChange={(e) => {
+              const v = e.target.value
+              // 노드 자체 이벤트로 직접 갱신 (핸들러 주입 여부와 무관하게 동작)
+              window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { model: v } } }))
+              data.onModelChange?.(v)
+            }}
           >
             <option value="">— 모델 선택 —</option>
             {data.models.map((m) => (
