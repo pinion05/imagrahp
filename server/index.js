@@ -180,4 +180,4 @@ app.post('/api/generate', async (req, res) => {
   res.status(502).json({ ok: false, error: `자동 재시도 ${MAX_RETRIES}회 소진 — ${lastErr}`, attempts: MAX_RETRIES })
 })
 
-app.listen(PORT, () => console.log(`nodegrahp server on :${PORT}`))
+app.listen(PORT, () => console.log(`imagraph server on :${PORT}`))
