@@ -171,6 +171,12 @@ body {
 }
 .nf-prompt-text:focus { border-color: rgba(255, 255, 255, 0.2); }
 
+/* IME(한국어 등) 입력 허용 — React Flow의 user-select:none이 조합 입력을 차단함 */
+.nf-prompt-text, .nf-title-input, .nf-model-select, .panel input, .panel select {
+  -webkit-user-select: text;
+  user-select: text;
+}
+
 .nf-run {
   margin-top: 10px;
   width: 100%;

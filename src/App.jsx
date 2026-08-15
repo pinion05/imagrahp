@@ -107,12 +107,22 @@ export default function App() {
     // create result node hooked to model output
     const resultId = nid('result')
     const modelPos = modelNode.position
-    const existingResults = ns.filter((n) => n.type === 'result').length
+    // 결과 노드 배치: 모델 노드 기준 고정 영역(3열 × 2행 그리드)에서 빈 자리 찾기
+    // — 같은 모델에서 반복 생성해도 화면 밖으로 내려가지 않음
+    const COLS = 3, GAP_X = 240, GAP_Y = 300, TOP = 120
+    const occupied = new Set(
+      ns.map((n) => `${Math.round((n.position.x - (modelPos.x + 380)) / GAP_X)}:${Math.round((n.position.y - TOP) / GAP_Y)}`)
+    )
+    let slot = 0
+    while (occupied.has(`${Math.floor(slot % COLS)}:${Math.floor(slot / COLS)}`) && slot < COLS * 8) slot++
+    const slotX = modelPos.x + 380 + (slot % COLS) * GAP_X
+    const slotY = TOP + Math.floor(slot / COLS) * GAP_Y
+    const totalResults = ns.filter((n) => n.type === 'result').length + 1
     const resultNode = {
       id: resultId,
       type: 'result',
-      position: { x: modelPos.x + 380, y: 120 + existingResults * 280 },
-      data: { status: 'running', statusText: '생성 중…', tag: `v${existingResults + 1}` }
+      position: { x: slotX, y: slotY },
+      data: { status: 'running', statusText: '생성 중…', tag: `v${totalResults}` }
     }
     setNodes((cur) => [...cur, resultNode])
     setEdges((cur) => [...cur, { id: `e_${resultId}`, source: modelNode.id, sourceHandle: 'out', target: resultId, targetHandle: 'in' }])
