@@ -6,10 +6,12 @@ import {
   addEdge,
   useNodesState,
   useEdgesState,
+  useReactFlow,
   BackgroundVariant
 } from '@xyflow/react'
 import '@xyflow/react/dist/style.css'
 import { nodeTypes } from './nodes.jsx'
+import { ReactFlowProvider } from '@xyflow/react'
 
 let nextId = 100
 const nid = (p) => `${p}_${nextId++}`
@@ -33,12 +35,23 @@ const initialEdges = [
 ]
 
 export default function App() {
+  return (
+    <ReactFlowProvider>
+      <AppInner />
+    </ReactFlowProvider>
+  )
+}
+
+function AppInner() {
+  const { screenToFlowPosition } = useReactFlow()
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [settings, setSettings] = useState({ model: null, hasKey: false })
   const [models, setModels] = useState([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
+  const [logOpen, setLogOpen] = useState(false)
+  const [ctxMenu, setCtxMenu] = useState(null) // {x, y, flowX, flowY}
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [toasts, setToasts] = useState([])
   const stateRef = useRef({ nodes, edges })
@@ -66,8 +79,7 @@ export default function App() {
     const r = await fetch('/api/settings')
     const j = await r.json()
     setSettings({ ...j, loaded: true })
-    if (j.model) patchNode('model_1', { model: j.model })
-  }, [patchNode])
+  }, [])
 
   useEffect(() => { loadSettings() }, [loadSettings])
 
@@ -137,7 +149,7 @@ export default function App() {
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt, referenceFiles })
+        body: JSON.stringify({ prompt: finalPrompt, referenceFiles, model: modelNode.data.model })
       })
       const j = await r.json()
       if (j.ok) {
@@ -156,19 +168,35 @@ export default function App() {
   }, [patchNode, setNodes, setEdges, toast])
 
   // ---------- add nodes ----------
-  const addNode = useCallback((type) => {
+  const addNode = useCallback((type, x, y) => {
     const id = nid(type === 'image' ? 'img' : type === 'prompt' ? 'prompt' : 'model')
     const dataMap = {
       image: {},
       prompt: { prompt: '' },
-      model: { model: settings.model, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) }
+      model: { model: null, run, models, onModelChange: (m) => patchNode(id, { model: m }), onOpenSettings: () => setPanelOpen(true) }
     }
     setNodes((ns) => [...ns, {
       id, type,
-      position: { x: 200 + Math.random() * 200, y: 200 + Math.random() * 200 },
+      position: { x: x ?? 200 + Math.random() * 200, y: y ?? 200 + Math.random() * 200 },
       data: dataMap[type]
     }])
-  }, [setNodes, settings.model, run])
+  }, [setNodes, run, models, patchNode])
+  const addNodeAt = addNode
+
+  // ---------- 우클릭 컨텍스트 메뉴 ----------
+  const onPaneContextMenu = useCallback((e) => {
+    e.preventDefault()
+    const wrap = document.querySelector('.canvas-wrap').getBoundingClientRect()
+    const flow = screenToFlowPosition({ x: e.clientX, y: e.clientY })
+    setCtxMenu({ x: e.clientX - wrap.left, y: e.clientY - wrap.top, flowX: flow.x, flowY: flow.y })
+  }, [screenToFlowPosition])
+
+  useEffect(() => {
+    const close = () => setCtxMenu(null)
+    window.addEventListener('click', close)
+    window.addEventListener('blur', close)
+    return () => { window.removeEventListener('click', close); window.removeEventListener('blur', close) }
+  }, [])
 
   // ---------- connect (유효 연결만) ----------
   const isValidConnection = useCallback((conn) => {
@@ -198,12 +226,7 @@ export default function App() {
   }, [settings.loaded, settings.hasKey])
 
   // ---------- settings ----------
-  const saveModel = useCallback(async (model) => {
-    setSettings((s) => ({ ...s, model }))
-    // 전역 1모델: 모든 모델 노드에 즉시 전파
-    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, model } } : n)))
-    await fetch('/api/settings', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ model }) })
-  }, [setNodes])
+  // 모델은 노드 단위 — 전역 설정 아님. 노드에서 onChange 시 patchNode로 해당 노드만 갱신.
 
   const loadModels = useCallback(async () => {
     setModelsLoading(true)
@@ -238,9 +261,10 @@ export default function App() {
   }, [settings.loaded, settings.hasKey]) // eslint-disable-line
 
   // inject run + model list/handlers into model nodes (선언 이후 위치)
+  const nodeModelHandler = useCallback((nodeId, m) => patchNode(nodeId, { model: m }), [patchNode])
   useEffect(() => {
-    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) } } : n)))
-  }, [run, models, saveModel, setNodes])
+    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run, models, onModelChange: (m) => nodeModelHandler(n.id, m), onOpenSettings: () => setPanelOpen(true) } } : n)))
+  }, [run, models, nodeModelHandler, setNodes])
 
   // ---------- canvas background drop → image node ----------
   const onDragOver = useCallback((e) => {
@@ -340,7 +364,7 @@ export default function App() {
 
   // 붙여넣은 모델 노드에 run/handlers 재주입 (노드 수 변화 감지)
   useEffect(() => {
-    setNodes((ns) => ns.map((n) => (n.type === 'model' && !n.data.run ? { ...n, data: { ...n.data, run, models, onModelChange: saveModel, onOpenSettings: () => setPanelOpen(true) } } : n)))
+    setNodes((ns) => ns.map((n) => (n.type === 'model' && !n.data.run ? { ...n, data: { ...n.data, run, models, onModelChange: (m) => patchNode(n.id, { model: m }), onOpenSettings: () => setPanelOpen(true) } } : n)))
   }, [nodes.length]) // eslint-disable-line
 
   return (
@@ -348,13 +372,9 @@ export default function App() {
       <div className="topbar">
         <div className="logo">imagraph</div>
         <div className="tb-sep" />
-        <div className="tb-item">
-          <span className={`dot ${settings.model && settings.hasKey ? '' : 'off'}`} />
-          <b>{settings.model || '모델 미설정'}</b> · openrouter
-        </div>
-        <div className="tb-sep" />
         <div className="tb-item">node {nodes.length} · edge {edges.length}</div>
         <div className="tb-right">
+          <div className="tb-item tb-click" onClick={() => setLogOpen((o) => !o)}>CHANGELOG</div>
           <div className="tb-item">{settings.hasKey ? 'API KEY ✓' : 'API KEY ✗'}</div>
           <div className="gear" onClick={() => setPanelOpen((o) => !o)}>⚙</div>
         </div>
@@ -370,6 +390,7 @@ export default function App() {
           onConnect={onConnect}
           onDragOver={onDragOver}
           onDrop={onDrop}
+          onPaneContextMenu={onPaneContextMenu}
           deleteKeyCode={['Delete', 'Backspace']}
           multiSelectionKeyCode={['Shift', 'Meta']}
           selectionOnDrag
@@ -403,39 +424,9 @@ export default function App() {
                 onKeyDown={(e) => e.key === 'Enter' && saveKey()}
               />
             </div>
-            <div className="field">
-              <div className="lab">MODEL · 전역 1개 {models.length > 0 && `· ${models.length}개 · 저가순`}</div>
-              {models.length === 0 ? (
-                <div className="list-status">
-                  {modelsLoading ? '모델 목록 로딩 중…' : 'API 키 저장 후 목록이 표시됩니다'}
-                </div>
-              ) : (
-                <div className="model-list">
-                  {models.map((m) => (
-                    <div
-                      key={m.id}
-                      className={`mrow-item ${settings.model === m.id ? 'on' : ''}`}
-                      onClick={() => saveModel(m.id)}
-                      title={m.id}
-                    >
-                      <div className="mid">
-                        <div className="mname">{m.id}</div>
-                        <div className="msub">{m.name}</div>
-                      </div>
-                      {m.streaming && <span className="mbadge">STREAM</span>}
-                      <span className={`price ${m.price != null ? 'has' : ''}`}>
-                        {m.price == null ? '—' : m.priceUnit === 'token'
-                          ? `$${fmtPrice(m.price)}/1k tok`
-                          : `$${fmtPrice(m.price)}/img`}
-                      </span>
-                    </div>
-                  ))}
-                </div>
-              )}
-            </div>
             <div className="hint">
-              // 키는 로컬(.data/settings.json)에만 저장 · 환경변수 OPENROUTER_API_KEY / OPENROUTER_MODEL로 사전 설정 가능<br />
-              // 모델 변경 시 새 생성부터 적용
+              // 키는 로컬(.data/settings.json)에만 저장 · 환경변수 OPENROUTER_API_KEY로 사전 설정 가능<br />
+              // 모델은 각 모델 노드에서 직접 선택
             </div>
           </div>
         )}
@@ -450,6 +441,40 @@ export default function App() {
         </div>
 
         <div className="corner-br">v0.1.0 // self-hosted</div>
+
+        {logOpen && (
+          <div className="panel changelog-panel">
+            <div className="panel-head">
+              <div className="t">CHANGELOG</div>
+              <div className="x" onClick={() => setLogOpen(false)}>✕</div>
+            </div>
+            <div className="log-body">
+              <div className="log-entry">
+                <div className="log-ver">v0.1.0</div>
+                <ul>
+                  <li>노드 3종 (이미지/프롬프트/모델), 연쇄 편집</li>
+                  <li>노드 이름으로 캐릭터 지정 (제임스/존)</li>
+                  <li>캔버스 배경 드롭 업로드</li>
+                  <li>다중 입력 전체 전달</li>
+                  <li>Ctrl+C/V 노드 복붙</li>
+                  <li>브러시 에디트 (✎)</li>
+                  <li>이미지 비율 자동 맞춤</li>
+                  <li>결과 노드 = 이미지 노드 통일</li>
+                  <li>모델 노드 단위 선택 (전역 모델 제거)</li>
+                  <li>우클릭 컨텍스트 메뉴로 노드 생성</li>
+                </ul>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {ctxMenu && (
+          <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
+            <div className="ctx-item" onClick={() => { addNodeAt('image', ctxMenu.flowX, ctxMenu.flowY); setCtxMenu(null) }}>이미지 노드</div>
+            <div className="ctx-item" onClick={() => { addNodeAt('prompt', ctxMenu.flowX, ctxMenu.flowY); setCtxMenu(null) }}>프롬프트 노드</div>
+            <div className="ctx-item" onClick={() => { addNodeAt('model', ctxMenu.flowX, ctxMenu.flowY); setCtxMenu(null) }}>모델 노드</div>
+          </div>
+        )}
       </div>
     </>
   )

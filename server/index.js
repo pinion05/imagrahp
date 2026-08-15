@@ -22,28 +22,26 @@ function readStored() {
 function writeStored(s) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2))
 }
-// 배포 시 환경변수로 미리 삽입 가능 (UI 저장값이 우선, 없으면 env fallback)
+// 배포 시 환경변수로 키 사전 삽입 가능 (UI 저장값이 우선)
 function effectiveSettings() {
   const s = readStored()
   return {
     ...s,
-    model: s.model || process.env.OPENROUTER_MODEL || null,
     openrouterKey: s.openrouterKey || process.env.OPENROUTER_API_KEY || null
   }
 }
 
 app.get('/api/settings', (_req, res) => {
   const s = effectiveSettings()
-  res.json({ model: s.model, hasKey: Boolean(s.openrouterKey) })
+  res.json({ hasKey: Boolean(s.openrouterKey) })
 })
 
 app.post('/api/settings', (req, res) => {
   const s = readStored()
-  if (typeof req.body.model === 'string') s.model = req.body.model
   if (typeof req.body.openrouterKey === 'string') s.openrouterKey = req.body.openrouterKey
   writeStored(s)
   const e = effectiveSettings()
-  res.json({ ok: true, model: e.model, hasKey: Boolean(e.openrouterKey) })
+  res.json({ ok: true, hasKey: Boolean(e.openrouterKey) })
 })
 
 // ---------- image models (with pricing) ----------
@@ -122,8 +120,8 @@ const MAX_RETRIES = 3
 app.post('/api/generate', async (req, res) => {
   const s = effectiveSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
-  if (!s.model) return res.status(400).json({ error: '모델이 선택되지 않았습니다' })
-  const { prompt, referenceFiles } = req.body
+  const { prompt, referenceFiles, model } = req.body
+  if (!model) return res.status(400).json({ error: '모델 노드에서 모델을 선택하세요' })
   if (!prompt) return res.status(400).json({ error: '프롬프트가 비었습니다' })
 
   const referenceUrls = (Array.isArray(referenceFiles) ? referenceFiles : referenceFiles ? [referenceFiles] : [])
@@ -135,10 +133,10 @@ app.post('/api/generate', async (req, res) => {
       const ext = p.endsWith('.png') ? 'png' : p.endsWith('.webp') ? 'webp' : 'jpeg'
       return [{ type: 'image_url', image_url: { url: `data:image/${ext};base64,${b64}` } }]
     })
-  console.log(`[generate] prompt ${prompt.length}자 · 참조 ${referenceUrls.length}장 → ${s.model}`)
+  console.log(`[generate] prompt ${prompt.length}자 · 참조 ${referenceUrls.length}장 → ${model}`)
 
   const body = {
-    model: s.model,
+    model,
     prompt,
     ...(referenceUrls.length > 0 ? { input_references: referenceUrls } : {})
   }
