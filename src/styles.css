@@ -275,6 +275,75 @@ body {
 .field select:focus, .field input:focus { border-color: rgba(255, 255, 255, 0.25); }
 .hint { font-family: var(--font-mono); font-size: 9px; color: var(--text-dark); padding: 0 16px 14px; line-height: 1.6; }
 
+/* ---------- model list ---------- */
+.model-list {
+  max-height: 260px;
+  overflow-y: auto;
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 6px;
+  background: rgba(0, 0, 0, 0.3);
+}
+.model-list::-webkit-scrollbar { width: 8px; }
+.model-list::-webkit-scrollbar-thumb { background: #222; border-radius: 4px; }
+.mrow-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  cursor: pointer;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+}
+.mrow-item:last-child { border-bottom: none; }
+.mrow-item:hover { background: rgba(255, 255, 255, 0.04); }
+.mrow-item.on { background: rgba(255, 255, 255, 0.07); }
+.mrow-item .mid { flex: 1; min-width: 0; }
+.mrow-item .mname {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  color: #ddd;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.mrow-item.on .mname::before {
+  content: "▸";
+  color: #fff;
+  margin-left: -4px;
+}
+.mrow-item .msub {
+  font-family: var(--font-mono);
+  font-size: 9px;
+  color: var(--text-dark);
+  margin-top: 2px;
+}
+.mrow-item .price {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  flex-shrink: 0;
+}
+.mrow-item .price.has { color: #b8f0cd; }
+.mbadge {
+  font-family: var(--font-mono);
+  font-size: 8px;
+  letter-spacing: 0.08em;
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 3px;
+  padding: 1px 4px;
+  flex-shrink: 0;
+}
+.list-status {
+  font-family: var(--font-mono);
+  font-size: 10px;
+  color: var(--text-dim);
+  padding: 10px;
+  text-align: center;
+}
+
 /* ---------- toast ---------- */
 .toast-zone { position: absolute; left: 24px; bottom: 24px; display: flex; flex-direction: column; gap: 8px; z-index: 60; }
 .toast {

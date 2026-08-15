@@ -37,22 +37,48 @@ app.post('/api/settings', (req, res) => {
   res.json({ ok: true, model: s.model || null, hasKey: Boolean(s.openrouterKey) })
 })
 
-// ---------- image models ----------
+// ---------- image models (with pricing) ----------
 app.get('/api/models', async (_req, res) => {
   const s = readSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
   try {
-    const r = await fetch('https://openrouter.ai/api/v1/images/models', {
-      headers: { Authorization: `Bearer ${s.openrouterKey}` }
-    })
-    if (!r.ok) return res.status(r.status).json({ error: `OpenRouter ${r.status}` })
-    const j = await r.json()
-    const models = (j.data || [])
-      .filter(m => (m.architecture?.input_modalities || []).includes('image') || true)
-      .map(m => ({ id: m.id, name: m.name, streaming: m.supports_streaming }))
+    const [modelsRes] = await Promise.all([
+      fetch('https://openrouter.ai/api/v1/images/models', {
+        headers: { Authorization: `Bearer ${s.openrouterKey}` }
+      })
+    ])
+    if (!modelsRes.ok) return res.status(modelsRes.status).json({ error: `OpenRouter ${modelsRes.status}` })
+    const j = await modelsRes.json()
+    const models = await Promise.all((j.data || []).map(async (m) => {
+      // fetch per-endpoint pricing (cheapest endpoint wins)
+      let price = null
+      try {
+        const er = await fetch(`https://openrouter.ai${m.endpoints}`, {
+          headers: { Authorization: `Bearer ${s.openrouterKey}` }
+        })
+        if (er.ok) {
+          const ej = await er.json()
+          const costs = (ej.endpoints || [])
+            .flatMap((e) => e.pricing || [])
+            .filter((p) => p.billable === 'output_image' && typeof p.cost_usd === 'number')
+            .map((p) => p.cost_usd)
+          if (costs.length) price = Math.min(...costs)
+        }
+      } catch { /* pricing optional */ }
+      return {
+        id: m.id,
+        name: m.name,
+        streaming: m.supports_streaming,
+        price,
+        inputModalities: m.architecture?.input_modalities || []
+      }
+    }))
+    // cheapest first
+    models.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity))
     res.json({ models })
   } catch (e) {
-    res.status(500).json({ error: String(e) })
+    res.status(500).json({ error: String(e) }
+    )
   }
 })
 

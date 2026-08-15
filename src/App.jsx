@@ -29,6 +29,7 @@ export default function App() {
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [settings, setSettings] = useState({ model: null, hasKey: false })
   const [models, setModels] = useState([])
+  const [modelsLoading, setModelsLoading] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [toasts, setToasts] = useState([])
@@ -164,13 +165,18 @@ export default function App() {
   }, [apiKeyInput, loadSettings, toast])
 
   const loadModels = useCallback(async () => {
-    const r = await fetch('/api/models')
-    if (!r.ok) { toast(false, '모델 목록 조회 실패 — API 키를 확인하세요'); return }
-    const j = await r.json()
-    setModels(j.models || [])
+    setModelsLoading(true)
+    try {
+      const r = await fetch('/api/models')
+      if (!r.ok) { toast(false, '모델 목록 조회 실패 — API 키를 확인하세요'); setModels([]); return }
+      const j = await r.json()
+      setModels(j.models || [])
+    } finally {
+      setModelsLoading(false)
+    }
   }, [toast])
 
-  useEffect(() => { if (panelOpen && models.length === 0) loadModels() }, [panelOpen]) // eslint-disable-line
+  useEffect(() => { if (panelOpen) loadModels() }, [panelOpen]) // eslint-disable-line
 
   return (
     <>
@@ -218,11 +224,32 @@ export default function App() {
               <div className="x" onClick={() => setPanelOpen(false)}>✕</div>
             </div>
             <div className="field">
-              <div className="lab">MODEL · 전역 1개</div>
-              <select value={settings.model || ''} onChange={(e) => saveModel(e.target.value)}>
-                <option value="">— 선택 —</option>
-                {models.map((m) => <option key={m.id} value={m.id}>{m.id}</option>)}
-              </select>
+              <div className="lab">MODEL · 전역 1개 {models.length > 0 && `· ${models.length}개 · 저가순`}</div>
+              {models.length === 0 ? (
+                <div className="list-status">
+                  {modelsLoading ? '모델 목록 로딩 중…' : 'API 키 저장 후 목록이 표시됩니다'}
+                </div>
+              ) : (
+                <div className="model-list">
+                  {models.map((m) => (
+                    <div
+                      key={m.id}
+                      className={`mrow-item ${settings.model === m.id ? 'on' : ''}`}
+                      onClick={() => saveModel(m.id)}
+                      title={m.id}
+                    >
+                      <div className="mid">
+                        <div className="mname">{m.id}</div>
+                        <div className="msub">{m.name}</div>
+                      </div>
+                      {m.streaming && <span className="mbadge">STREAM</span>}
+                      <span className={`price ${m.price != null ? 'has' : ''}`}>
+                        {m.price != null ? `$${m.price < 0.01 ? m.price.toFixed(3) : m.price.toFixed(2)}/img` : '—'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             <div className="field">
               <div className="lab">OPENROUTER API KEY</div>
