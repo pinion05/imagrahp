@@ -45,14 +45,6 @@ export function ImageNode({ id, data, selected }) {
 }
 
 export function PromptNode({ id, data, selected }) {
-  const { getNode } = useReactFlow()
-  const { run } = data
-
-  const onRun = useCallback(() => {
-    // find model node connected from this prompt
-    run(id)
-  }, [id, run])
-
   return (
     <div className={`nf-node ${selected ? 'selected' : ''}`}>
       <div className="nf-head">
@@ -65,12 +57,7 @@ export function PromptNode({ id, data, selected }) {
           placeholder="프롬프트를 입력하세요…"
           value={data.prompt || ''}
           onChange={(e) => window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { prompt: e.target.value } } }))}
-          onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) onRun() }}
         />
-        <button className="nf-run" onClick={onRun} disabled={data.running}>
-          {data.running ? <span className="sdot" style={{ background: '#fff', boxShadow: 'none' }} /> : <span className="tri" />}
-          {data.running ? '생성 중…' : '실행'}
-        </button>
       </div>
       <Handle type="source" position={Position.Right} id="out" />
     </div>
@@ -78,6 +65,8 @@ export function PromptNode({ id, data, selected }) {
 }
 
 export function ModelNode({ id, data, selected }) {
+  const onRun = useCallback(() => { data.run?.(id) }, [id, data])
+
   return (
     <div className={`nf-node ${selected ? 'selected' : ''}`}>
       <div className="nf-head">
@@ -89,12 +78,14 @@ export function ModelNode({ id, data, selected }) {
           <span>{data.model || '(미설정)'}</span>
           <span className="lock">⚿ 전역</span>
         </div>
-        <div className="nf-port-row"><span>in · image</span><span className="v">1</span></div>
-        <div className="nf-port-row"><span>in · prompt</span><span className="v">1</span></div>
+        <div className="nf-port-row"><span>in · image / prompt</span><span className="v">1</span></div>
         <div className="nf-port-row"><span>out · image</span><span className="v">→</span></div>
+        <button className="nf-run" onClick={onRun} disabled={data.running}>
+          {data.running ? <span className="sdot" style={{ background: '#fff', boxShadow: 'none' }} /> : <span className="tri" />}
+          {data.running ? '생성 중…' : '실행'}
+        </button>
       </div>
-      <Handle type="target" position={Position.Left} id="image" style={{ top: 38 }} />
-      <Handle type="target" position={Position.Left} id="prompt" style={{ top: 92 }} />
+      <Handle type="target" position={Position.Left} id="in" />
       <Handle type="source" position={Position.Right} id="out" />
     </div>
   )

@@ -19,11 +19,11 @@ const fmtPrice = (p) => (p >= 1 ? p.toFixed(2) : p >= 0.01 ? p.toFixed(3) : p.to
 const initialNodes = [
   { id: 'img_1', type: 'image', position: { x: 80, y: 140 }, data: {} },
   { id: 'prompt_1', type: 'prompt', position: { x: 80, y: 460 }, data: { prompt: '' } },
-  { id: 'model_1', type: 'model', position: { x: 480, y: 260 }, data: { model: null } }
+  { id: 'model_1', type: 'model', position: { x: 480, y: 260 }, data: { model: null, run: null } }
 ]
 const initialEdges = [
-  { id: 'e1', source: 'img_1', sourceHandle: 'out', target: 'model_1', targetHandle: 'image' },
-  { id: 'e2', source: 'prompt_1', sourceHandle: 'out', target: 'model_1', targetHandle: 'prompt' }
+  { id: 'e1', source: 'img_1', sourceHandle: 'out', target: 'model_1', targetHandle: 'in' },
+  { id: 'e2', source: 'prompt_1', sourceHandle: 'out', target: 'model_1', targetHandle: 'in' }
 ]
 
 export default function App() {
@@ -65,23 +65,25 @@ export default function App() {
 
   useEffect(() => { loadSettings() }, [loadSettings])
 
-  // ---------- run (prompt node) ----------
-  const run = useCallback(async (promptNodeId) => {
+  // ---------- run (model node) ----------
+  const run = useCallback(async (modelNodeId) => {
     const { nodes: ns, edges: es } = stateRef.current
-    const promptNode = ns.find((n) => n.id === promptNodeId)
-    if (!promptNode) return
+    const modelNode = ns.find((n) => n.id === modelNodeId)
+    if (!modelNode || modelNode.type !== 'model') return
+
+    // upstream prompt: prompt node connected into this model
+    const inEdges = es.filter((e) => e.target === modelNode.id)
+    const promptNode = inEdges
+      .map((e) => ns.find((n) => n.id === e.source))
+      .find((n) => n?.type === 'prompt')
+    if (!promptNode) { toast(false, '프롬프트 노드가 연결되지 않았습니다'); return }
     const prompt = promptNode.data.prompt || ''
     if (!prompt.trim()) { toast(false, '프롬프트가 비었습니다'); return }
 
-    // find edge prompt → model
-    const edge = es.find((e) => e.source === promptNodeId)
-    if (!edge) { toast(false, '모델 노드에 연결되지 않았습니다'); return }
-    const modelNode = ns.find((n) => n.id === edge.target)
-    if (!modelNode || modelNode.type !== 'model') { toast(false, '연결 대상이 모델 노드가 아닙니다'); return }
-
-    // find reference image: model node ← image node
-    const imgEdge = es.find((e) => e.target === modelNode.id && e.targetHandle === 'image')
-    const imgNode = imgEdge ? ns.find((n) => n.id === imgEdge.source) : null
+    // reference image: any image/result node connected INTO the model node
+    const imgNode = inEdges
+      .map((e) => ns.find((n) => n.id === e.source))
+      .find((n) => (n?.type === 'image' || n?.type === 'result') && n?.data?.file)
     const referenceFile = imgNode?.data?.file || null
 
     // create result node hooked to model output
@@ -96,7 +98,7 @@ export default function App() {
     }
     setNodes((cur) => [...cur, resultNode])
     setEdges((cur) => [...cur, { id: `e_${resultId}`, source: modelNode.id, sourceHandle: 'out', target: resultId, targetHandle: 'in' }])
-    patchNode(promptNodeId, { running: true })
+    patchNode(modelNode.id, { running: true })
 
     try {
       const r = await fetch('/api/generate', {
@@ -116,13 +118,13 @@ export default function App() {
       patchNode(resultId, { status: 'err', statusText: '실패', meta: String(e).slice(0, 60) })
       toast(false, '서버 오류')
     } finally {
-      patchNode(promptNodeId, { running: false })
+      patchNode(modelNode.id, { running: false })
     }
   }, [patchNode, setNodes, setEdges, toast])
 
-  // inject run into prompt nodes
+  // inject run into model nodes
   useEffect(() => {
-    setNodes((ns) => ns.map((n) => (n.type === 'prompt' ? { ...n, data: { ...n.data, run } } : n)))
+    setNodes((ns) => ns.map((n) => (n.type === 'model' ? { ...n, data: { ...n.data, run } } : n)))
   }, [run, setNodes])
 
   // ---------- add nodes ----------
@@ -130,8 +132,8 @@ export default function App() {
     const id = nid(type === 'image' ? 'img' : type === 'prompt' ? 'prompt' : 'model')
     const dataMap = {
       image: {},
-      prompt: { prompt: '', run },
-      model: { model: settings.model }
+      prompt: { prompt: '' },
+      model: { model: settings.model, run }
     }
     setNodes((ns) => [...ns, {
       id, type,
