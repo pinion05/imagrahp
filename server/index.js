@@ -59,19 +59,23 @@ app.get('/api/models', async (_req, res) => {
     if (!modelsRes.ok) return res.status(modelsRes.status).json({ error: `OpenRouter ${modelsRes.status}` })
     const j = await modelsRes.json()
     const models = await Promise.all((j.data || []).map(async (m) => {
-      // fetch per-endpoint pricing (cheapest endpoint wins)
+      // fetch per-endpoint pricing (cheapest output price wins)
       let price = null
+      let priceUnit = null
       try {
         const er = await fetch(`https://openrouter.ai${m.endpoints}`, {
           headers: { Authorization: `Bearer ${s.openrouterKey}` }
         })
         if (er.ok) {
           const ej = await er.json()
-          const costs = (ej.endpoints || [])
+          const outs = (ej.endpoints || [])
             .flatMap((e) => e.pricing || [])
-            .filter((p) => p.billable === 'output_image' && typeof p.cost_usd === 'number')
-            .map((p) => p.cost_usd)
-          if (costs.length) price = Math.min(...costs)
+            .filter((p) => p.billable === 'output_image' && typeof p.cost_usd === 'number' && p.cost_usd > 0)
+          if (outs.length) {
+            const min = outs.reduce((a, b) => (a.cost_usd < b.cost_usd ? a : b))
+            price = min.cost_usd
+            priceUnit = min.unit
+          }
         }
       } catch { /* pricing optional */ }
       return {
@@ -79,6 +83,7 @@ app.get('/api/models', async (_req, res) => {
         name: m.name,
         streaming: m.supports_streaming,
         price,
+        priceUnit,
         inputModalities: m.architecture?.input_modalities || []
       }
     }))

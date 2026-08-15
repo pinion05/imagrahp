@@ -14,6 +14,8 @@ import { nodeTypes } from './nodes.jsx'
 let nextId = 100
 const nid = (p) => `${p}_${nextId++}`
 
+const fmtPrice = (p) => (p >= 1 ? p.toFixed(2) : p >= 0.01 ? p.toFixed(3) : p.toFixed(5))
+
 const initialNodes = [
   { id: 'img_1', type: 'image', position: { x: 80, y: 140 }, data: {} },
   { id: 'prompt_1', type: 'prompt', position: { x: 80, y: 460 }, data: { prompt: '' } },
@@ -260,7 +262,9 @@ export default function App() {
                       </div>
                       {m.streaming && <span className="mbadge">STREAM</span>}
                       <span className={`price ${m.price != null ? 'has' : ''}`}>
-                        {m.price != null ? `$${m.price < 0.01 ? m.price.toFixed(3) : m.price.toFixed(2)}/img` : '—'}
+                        {m.price == null ? '—' : m.priceUnit === 'token'
+                          ? `$${fmtPrice(m.price)}/1k tok`
+                          : `$${fmtPrice(m.price)}/img`}
                       </span>
                     </div>
                   ))}
