@@ -5,18 +5,28 @@ export function ImageNode({ id, data, selected }) {
   const inputRef = useRef(null)
   const [over, setOver] = useState(false)
   const [ratio, setRatio] = useState(1) // 입력 이미지 비율 (w/h)
+  const [thumbWidth, setThumbWidth] = useState(180)
+  const thumbRef = useRef(null)
   const [editMode, setEditMode] = useState(false)
   const [hasDraw, setHasDraw] = useState(false)
   const canvasRef = useRef(null)
   const drawing = useRef(false)
 
-  // 이미지 비율 감지
+  // 이미지 비율 감지 + 썸네일 실제 폭 추적
   useEffect(() => {
     if (!data.url) { setRatio(1); return }
     const img = new Image()
     img.onload = () => setRatio(img.naturalWidth / img.naturalHeight || 1)
     img.src = data.url
   }, [data.url])
+
+  useEffect(() => {
+    const el = thumbRef.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setThumbWidth(el.getBoundingClientRect().width))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
 
   const upload = useCallback(async (file) => {
     if (!file || !file.type.startsWith('image/')) return
@@ -129,8 +139,9 @@ export function ImageNode({ id, data, selected }) {
         {data.status === 'err' && <div className="nf-tag">{data.tag || '실패'}</div>}
       </div>
       <div
+        ref={thumbRef}
         className={`nf-thumb ${editMode ? 'editing' : ''}`}
-        style={data.url ? { width: 180, height: Math.round(180 / ratio) } : undefined}
+        style={data.url ? { height: Math.round(thumbWidth / ratio) } : undefined}
         onDragOver={(e) => { if (!editMode) { e.preventDefault(); setOver(true) } }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { if (!editMode) { e.preventDefault(); setOver(false); upload(e.dataTransfer.files[0]) } }}
