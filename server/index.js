@@ -13,6 +13,7 @@ fs.mkdirSync(IMAGES_DIR, { recursive: true })
 const app = express()
 app.use(express.json({ limit: '64mb' }))
 app.use(express.static(path.join(ROOT, 'dist')))
+app.get('/changelog', (_req, res) => res.sendFile(path.join(ROOT, 'dist', 'changelog.html')))
 
 // ---------- settings ----------
 function readStored() {

@@ -50,7 +50,6 @@ function AppInner() {
   const [models, setModels] = useState([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
-  const [logOpen, setLogOpen] = useState(false)
   const [ctxMenu, setCtxMenu] = useState(null) // {x, y, flowX, flowY}
   const [apiKeyInput, setApiKeyInput] = useState('')
   const [toasts, setToasts] = useState([])
@@ -374,7 +373,7 @@ function AppInner() {
         <div className="tb-sep" />
         <div className="tb-item">node {nodes.length} · edge {edges.length}</div>
         <div className="tb-right">
-          <div className="tb-item tb-click" onClick={() => setLogOpen((o) => !o)}>CHANGELOG</div>
+          <a className="tb-item tb-click" href="/changelog">CHANGELOG</a>
           <div className="tb-item">{settings.hasKey ? 'API KEY ✓' : 'API KEY ✗'}</div>
           <div className="gear" onClick={() => setPanelOpen((o) => !o)}>⚙</div>
         </div>
@@ -441,32 +440,6 @@ function AppInner() {
         </div>
 
         <div className="corner-br">v0.1.0 // self-hosted</div>
-
-        {logOpen && (
-          <div className="panel changelog-panel">
-            <div className="panel-head">
-              <div className="t">CHANGELOG</div>
-              <div className="x" onClick={() => setLogOpen(false)}>✕</div>
-            </div>
-            <div className="log-body">
-              <div className="log-entry">
-                <div className="log-ver">v0.1.0</div>
-                <ul>
-                  <li>노드 3종 (이미지/프롬프트/모델), 연쇄 편집</li>
-                  <li>노드 이름으로 캐릭터 지정 (제임스/존)</li>
-                  <li>캔버스 배경 드롭 업로드</li>
-                  <li>다중 입력 전체 전달</li>
-                  <li>Ctrl+C/V 노드 복붙</li>
-                  <li>브러시 에디트 (✎)</li>
-                  <li>이미지 비율 자동 맞춤</li>
-                  <li>결과 노드 = 이미지 노드 통일</li>
-                  <li>모델 노드 단위 선택 (전역 모델 제거)</li>
-                  <li>우클릭 컨텍스트 메뉴로 노드 생성</li>
-                </ul>
-              </div>
-            </div>
-          </div>
-        )}
 
         {ctxMenu && (
           <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
