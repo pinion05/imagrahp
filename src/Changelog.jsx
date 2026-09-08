@@ -2,6 +2,13 @@ import React from 'react'
 
 const LOG = [
   {
+    ver: 'v0.2.3',
+    date: '2026-09-08',
+    items: [
+      '노드 최대 크기 제한 — 큰 이미지 업로드 시 노드가 무한 커지던 문제 수정 (폭 320px·썸네일 높이 300px 상한)',
+    ]
+  },
+  {
     ver: 'v0.2.2',
     date: '2026-09-08',
     items: [
