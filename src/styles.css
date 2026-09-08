@@ -175,6 +175,8 @@ body {
   color: var(--text-dark);
   padding: 0 10px 8px;
   letter-spacing: 0.04em;
+  white-space: normal; /* 세로형 노드에서 안내 문구가 노드 폭을 밀어내지 않게 줄바꿈 허용 */
+  overflow-wrap: anywhere;
 }
 .nf-thumb .dropzone {
   position: absolute; inset: 0;
