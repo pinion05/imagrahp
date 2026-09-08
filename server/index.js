@@ -24,6 +24,18 @@ function readStored() {
 function writeStored(s) {
   fs.writeFileSync(SETTINGS_FILE, JSON.stringify(s, null, 2))
 }
+
+// ---------- 누적 사용비용 (settings.json의 totalCost에 영구 누적) ----------
+function addCost(cost) {
+  if (typeof cost !== 'number' || !isFinite(cost) || cost <= 0) return
+  const s = readStored()
+  s.totalCost = (typeof s.totalCost === 'number' ? s.totalCost : 0) + cost
+  writeStored(s)
+}
+app.get('/api/cost', (_req, res) => {
+  const s = readStored()
+  res.json({ totalCost: typeof s.totalCost === 'number' ? s.totalCost : 0 })
+})
 // 배포 시 환경변수로 키 사전 삽입 가능 (UI 저장값이 우선)
 function effectiveSettings() {
   const s = readStored()
@@ -171,6 +183,7 @@ app.post('/api/generate', async (req, res) => {
       const ext = media.includes('jpeg') ? 'jpg' : media.includes('webp') ? 'webp' : media.includes('svg') ? 'svg' : 'png'
       const id = crypto.randomUUID()
       fs.writeFileSync(path.join(IMAGES_DIR, `${id}.${ext}`), Buffer.from(item.b64_json, 'base64'))
+      addCost(j.usage?.cost) // 실제 청구액을 누적 비용에 반영
       return res.json({
         ok: true,
         file: `${id}.${ext}`,

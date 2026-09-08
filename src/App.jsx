@@ -47,6 +47,7 @@ function AppInner() {
   const [nodes, setNodes, onNodesChange] = useNodesState(initialNodes)
   const [edges, setEdges, onEdgesChange] = useEdgesState(initialEdges)
   const [settings, setSettings] = useState({ model: null, hasKey: false })
+  const [totalCost, setTotalCost] = useState(null) // 누적 사용비용 (null=로딩 전)
   const [models, setModels] = useState([])
   const [modelsLoading, setModelsLoading] = useState(false)
   const [panelOpen, setPanelOpen] = useState(false)
@@ -81,6 +82,16 @@ function AppInner() {
   }, [])
 
   useEffect(() => { loadSettings() }, [loadSettings])
+
+  // 누적 사용비용 로드
+  const loadCost = useCallback(async () => {
+    try {
+      const r = await fetch('/api/cost')
+      const j = await r.json()
+      setTotalCost(typeof j.totalCost === 'number' ? j.totalCost : 0)
+    } catch { /* 표시 생략 */ }
+  }, [])
+  useEffect(() => { loadCost() }, [loadCost])
 
   // ---------- run (model node) ----------
   const run = useCallback(async (modelNodeId) => {
@@ -154,6 +165,7 @@ function AppInner() {
       if (j.ok) {
         patchNode(resultId, { url: j.url, file: j.file, status: null })
         toast(true, `생성 완료 — ${j.attempts > 1 ? `재시도 ${j.attempts - 1}회 후 성공` : '1회 성공'}`)
+        if (typeof j.usage?.cost === 'number') setTotalCost((c) => (c ?? 0) + j.usage.cost)
       } else {
         patchNode(resultId, { status: 'err', tag: '실패' })
         toast(false, j.error || '생성 실패')
@@ -374,6 +386,7 @@ function AppInner() {
         <div className="tb-item">node {nodes.length} · edge {edges.length}</div>
         <div className="tb-right">
           <a className="tb-item tb-click" href="/changelog">CHANGELOG</a>
+          <div className="tb-item">TOTAL {totalCost == null ? '…' : `$${fmtPrice(totalCost)}`}</div>
           <div className="tb-item">{settings.hasKey ? 'API KEY ✓' : 'API KEY ✗'}</div>
           <div className="gear" onClick={() => setPanelOpen((o) => !o)}>⚙</div>
         </div>
@@ -439,7 +452,7 @@ function AppInner() {
           ))}
         </div>
 
-        <div className="corner-br">v0.2.1 // self-hosted</div>
+        <div className="corner-br">v0.2.2 // self-hosted</div>
 
         {ctxMenu && (
           <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
