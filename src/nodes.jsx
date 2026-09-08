@@ -216,7 +216,7 @@ export function ModelNode({ id, data, selected }) {
             <option value="">— 모델 선택 —</option>
             {data.models.map((m) => (
               <option key={m.id} value={m.id}>
-                {m.id}{m.price != null ? ` · ${m.priceUnit === 'token' ? `$${m.price}/1k tok` : `$${m.price}/img`}` : ''}
+                {m.id}{m.elo != null ? ` · E${m.elo}` : ''}{m.cost1k != null ? ` · $${m.cost1k}/1k` : m.price != null ? ` · ${m.priceUnit === 'token' ? `$${m.price}/1k tok` : `$${m.price}/img`}` : ''}
               </option>
             ))}
           </select>

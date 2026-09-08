@@ -2,6 +2,7 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import { CURATED_MODELS } from './models.js'
 
 const PORT = process.env.PORT || 7837
 const ROOT = path.resolve(process.cwd())
@@ -45,19 +46,21 @@ app.post('/api/settings', (req, res) => {
   res.json({ ok: true, hasKey: Boolean(e.openrouterKey) })
 })
 
-// ---------- image models (with pricing) ----------
+// ---------- image models (curated + pricing) ----------
+// 큐레이션 목록: server/models.js — 커뮤니티 벤치마크(AA 아레나 엘로) 기반 선별
 app.get('/api/models', async (_req, res) => {
   const s = effectiveSettings()
   if (!s.openrouterKey) return res.status(400).json({ error: 'API 키가 설정되지 않았습니다' })
   try {
-    const [modelsRes] = await Promise.all([
-      fetch('https://openrouter.ai/api/v1/images/models', {
-        headers: { Authorization: `Bearer ${s.openrouterKey}` }
-      })
-    ])
+    const modelsRes = await fetch('https://openrouter.ai/api/v1/images/models', {
+      headers: { Authorization: `Bearer ${s.openrouterKey}` }
+    })
     if (!modelsRes.ok) return res.status(modelsRes.status).json({ error: `OpenRouter ${modelsRes.status}` })
     const j = await modelsRes.json()
-    const models = await Promise.all((j.data || []).map(async (m) => {
+    // 화이트리스트만 통과 (카탈로그에 없는 큐레이션 항목은 자동 스킵)
+    const whitelist = new Map(CURATED_MODELS.map((c) => [c.id, c]))
+    const catalog = (j.data || []).filter((m) => whitelist.has(m.id))
+    const models = await Promise.all(catalog.map(async (m) => {
       // fetch per-endpoint pricing (cheapest output price wins)
       let price = null
       let priceUnit = null
@@ -77,21 +80,24 @@ app.get('/api/models', async (_req, res) => {
           }
         }
       } catch { /* pricing optional */ }
+      const cur = whitelist.get(m.id)
       return {
         id: m.id,
         name: m.name,
         streaming: m.supports_streaming,
         price,
         priceUnit,
-        inputModalities: m.architecture?.input_modalities || []
+        inputModalities: m.architecture?.input_modalities || [],
+        elo: cur.elo,
+        cost1k: cur.cost1k
       }
     }))
-    // cheapest first
-    models.sort((a, b) => (a.price ?? Infinity) - (b.price ?? Infinity))
+    // 큐레이션 순서(저가 → 고가) 유지
+    const order = new Map(CURATED_MODELS.map((c, i) => [c.id, i]))
+    models.sort((a, b) => order.get(a.id) - order.get(b.id))
     res.json({ models })
   } catch (e) {
-    res.status(500).json({ error: String(e) }
-    )
+    res.status(500).json({ error: String(e) })
   }
 })
 
