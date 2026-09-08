@@ -120,7 +120,13 @@ export function ImageNode({ id, data, selected }) {
   }, [hasDraw, id])
 
   return (
-    <div className={`nf-node ${selected ? 'selected' : ''}`}>
+    <div
+      className={`nf-node ${selected ? 'selected' : ''}`}
+      style={data.url && ratio < 1
+        // 세로형 이미지: 노드 폭을 이미지 비율에 맞춰 축소 — 좌우여백 없이 사진에 딱 맞게
+        ? { width: Math.max(Math.round(MAX_THUMB_H * ratio) + 20, 140) }
+        : undefined}
+    >
       <div className="nf-head">
         <input
           className="nodrag nf-title-input"
