@@ -2,6 +2,15 @@ import React from 'react'
 
 const LOG = [
   {
+    ver: 'v0.2.2',
+    date: '2026-09-08',
+    items: [
+      '우측 상단에 누적 사용비용(TOTAL $) 표시 — 성공한 생성의 실제 청구액만 합산',
+      '비용은 서버 settings.json에 영구 저장 (재시작·새로고침 후에도 유지)',
+      'Railway 배포는 릴리즈 발행 시 실행되도록 흐름 정리',
+    ]
+  },
+  {
     ver: 'v0.2.1',
     date: '2026-09-08',
     items: [
