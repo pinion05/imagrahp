@@ -101,6 +101,7 @@ body {
   box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), inset 0 1px 0 var(--glass-highlight);
   font-size: 12px;
   min-width: 180px;
+  max-width: 320px; /* 큰 이미지 업로드 시 노드 무한 확대 방지 */
 }
 .nf-node.selected {
   border-color: rgba(255, 255, 255, 0.3);
@@ -138,6 +139,7 @@ body {
   margin: 10px;
   width: calc(100% - 20px);
   height: 180px;
+  max-height: 300px; /* 세로로 긴 이미지의 노드 세로 확대 제한 */
   border-radius: 6px;
   overflow: hidden;
   border: 1px solid rgba(255, 255, 255, 0.08);

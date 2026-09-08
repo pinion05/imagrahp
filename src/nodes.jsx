@@ -20,6 +20,8 @@ export function ImageNode({ id, data, selected }) {
     img.src = data.url
   }, [data.url])
 
+  // 썸네일 높이 = 폭/비율. 단 상한(300px)을 넘지 않게 클램프 — 세로로 긴 이미지가 노드를 늘리는 것 방지
+  const MAX_THUMB_H = 300
   useEffect(() => {
     const el = thumbRef.current
     if (!el) return
@@ -140,7 +142,7 @@ export function ImageNode({ id, data, selected }) {
       <div
         ref={thumbRef}
         className={`nf-thumb ${editMode ? 'editing' : ''}`}
-        style={data.url ? { height: Math.round(thumbWidth / ratio) } : undefined}
+        style={data.url ? { height: Math.min(Math.round(thumbWidth / ratio), MAX_THUMB_H) } : undefined}
         onDragOver={(e) => { if (!editMode) { e.preventDefault(); setOver(true) } }}
         onDragLeave={() => setOver(false)}
         onDrop={(e) => { if (!editMode) { e.preventDefault(); setOver(false); upload(e.dataTransfer.files[0]) } }}
