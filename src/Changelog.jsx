@@ -2,6 +2,17 @@ import React from 'react'
 
 const LOG = [
   {
+    ver: 'v0.2.1',
+    date: '2026-09-08',
+    items: [
+      '모델 목록 큐레이션 — OpenRouter 전체 카탈로그(50개) 중 검증된 10개만 표시',
+      '선정 기준: Artificial Analysis 아레나 엘로 + 1k장당 실측 가격 + 2026년 최신 세대',
+      '구형·과잉가격 모델 제외 (Recraft V3/V4 Pro, GPT Image 1, FLUX.2, Nano Banana 1세대 등)',
+      '모델 드롭다운에 아레나 엘로(E) · 1k장당 비용($/1k) 표기',
+      '큐레이션 목록은 server/models.js에서 관리',
+    ]
+  },
+  {
     ver: 'v0.2.0',
     date: '2026-08-15',
     items: [
