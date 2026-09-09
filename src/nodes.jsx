@@ -189,7 +189,7 @@ export function PromptNode({ id, data, selected }) {
       </div>
       <div className="nf-prompt-body">
         <textarea
-          className="nf-prompt-text"
+          className="nf-prompt-text nodrag nowheel"
           placeholder="프롬프트를 입력하세요…"
           value={data.prompt || ''}
           onChange={(e) => window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { prompt: e.target.value } } }))}
