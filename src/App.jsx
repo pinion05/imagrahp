@@ -407,6 +407,9 @@ function AppInner() {
           multiSelectionKeyCode={['Shift', 'Meta']}
           selectionOnDrag
           panOnDrag={[1, 2]}
+          // React Flow Controls 버튼 기본색(#fefefe)이 다크 테마에서 안 보이는 문제 —
+          // 라이브러리가 버튼 스코프에서 변수를 재정의하므로 최상위 컨테이너에서 인라인으로 강제
+          style={{ '--xy-controls-button-background-color-default': '#0a0a0acc', '--xy-controls-button-background-color-hover-default': '#1c1c1c', '--xy-controls-button-color-default': '#888', '--xy-controls-button-color-hover-default': '#fff' }}
           proOptions={{ hideAttribution: true }}
           defaultEdgeOptions={{ type: 'default' }}
         >
