@@ -2,6 +2,13 @@ import React from 'react'
 
 const LOG = [
   {
+    ver: 'v0.2.5',
+    date: '2026-09-09',
+    items: [
+      '우측 하단 캔버스 컨트롤 버튼이 흰색으로 안 보이던 문제 수정 — 다크 테마 적용 (배경 #0a0a0a·아이콘 #888, hover 시 밝아짐)',
+    ]
+  },
+  {
     ver: 'v0.2.4',
     date: '2026-09-08',
     items: [
