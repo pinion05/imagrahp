@@ -373,6 +373,55 @@ function AppInner() {
     return () => window.removeEventListener('keydown', onKey)
   }, [onCopy, onPaste])
 
+  // ---------- 클립보드 이미지 붙여넣기 → 마우스 위치에 이미지 노드 삽입 ----------
+  const mousePosRef = useRef({ x: 0, y: 0 })
+  useEffect(() => {
+    const track = (e) => { mousePosRef.current = { x: e.clientX, y: e.clientY } }
+    window.addEventListener('mousemove', track)
+    return () => window.removeEventListener('mousemove', track)
+  }, [])
+
+  useEffect(() => {
+    const onPasteImage = async (e) => {
+      const items = Array.from(e.clipboardData?.items || [])
+      const imgs = items.filter((it) => it.type.startsWith('image/'))
+      if (imgs.length === 0) return
+      e.preventDefault()
+
+      // 마우스 위치 → 캔버스 흐름 좌표
+      const { x: mx, y: my } = mousePosRef.current
+      const flow = screenToFlowPosition({ x: mx, y: my })
+
+      for (const [i, item] of imgs.entries()) {
+        const file = item.getAsFile()
+        if (!file) continue
+        const dataUrl = await new Promise((res) => {
+          const fr = new FileReader()
+          fr.onload = () => res(fr.result)
+          fr.readAsDataURL(file)
+        })
+        const r = await fetch('/api/upload', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ dataUrl })
+        })
+        const j = await r.json()
+        if (!j.url) continue
+        const id = nid('img')
+        setNodes((ns) => [...ns.map((n) => ({ ...n, selected: false })), {
+          id,
+          type: 'image',
+          position: { x: flow.x + i * 240, y: flow.y },
+          data: { file: j.file, url: j.url },
+          selected: true
+        }])
+        toast(true, `클립보드 이미지 붙여넣기 — 노드 ${imgs.length}개 생성`)
+      }
+    }
+    window.addEventListener('paste', onPasteImage)
+    return () => window.removeEventListener('paste', onPasteImage)
+  }, [screenToFlowPosition, setNodes, toast])
+
   // 붙여넣은 모델 노드에 run/handlers 재주입 (노드 수 변화 감지)
   useEffect(() => {
     setNodes((ns) => ns.map((n) => (n.type === 'model' && !n.data.run ? { ...n, data: { ...n.data, run, models, onModelChange: (m) => patchNode(n.id, { model: m }), onOpenSettings: () => setPanelOpen(true) } } : n)))
