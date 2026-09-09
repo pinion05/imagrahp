@@ -2,6 +2,13 @@ import React from 'react'
 
 const LOG = [
   {
+    ver: 'v0.2.6',
+    date: '2026-09-09',
+    items: [
+      '프롬프트 textarea에서 텍스트 드래그 선택이 가능하도록 수정 — 선택 중 노드가 움직이지 않음',
+    ]
+  },
+  {
     ver: 'v0.2.5',
     date: '2026-09-09',
     items: [
