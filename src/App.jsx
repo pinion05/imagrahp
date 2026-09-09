@@ -523,7 +523,7 @@ function AppInner() {
           ))}
         </div>
 
-        <div className="corner-br">v0.2.7 // self-hosted</div>
+        <div className="corner-br">v0.2.8 // self-hosted</div>
 
         {ctxMenu && (
           <div className="ctx-menu" style={{ left: ctxMenu.x, top: ctxMenu.y }}>
