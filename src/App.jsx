@@ -123,6 +123,19 @@ function AppInner() {
     const referenceFiles = sorted.slice(0, 10).map((n) => n.data.file)
     if (imgSources.length > 10) toast(false, `참조 이미지 ${imgSources.length}개 중 첫 10개만 전송됩니다`)
 
+    // 펜 표시 노드: 모델에는 "펜 없는 원본"을 전송하고, 펜 위치는 프롬프트(%)로 전달
+    // → AI가 펜 자국을 결과에 재현하는 문제를 구조적으로 차단
+    const transferFiles = sorted.slice(0, 10).map((n) => n.data.originalFile || n.data.file)
+    const penNotes = sorted.slice(0, 10)
+      .map((n, i) => ({ n, i }))
+      .filter(({ n }) => n.data.originalFile && n.data.penBox)
+      .map(({ n, i }) => {
+        const b = n.data.penBox
+        const pct = (v) => Math.round(v * 100)
+        const label = (n.data.title || '').trim() ? `"${(n.data.title || '').trim()}" 이미지` : `참조 이미지 ${i + 1}`
+        return `${label}: x ${pct(b.x)}%~${pct(b.x + b.w)}%, y ${pct(b.y)}%~${pct(b.y + b.h)}%`
+      })
+
     // 이름 매핑 안내: 모델이 참조 이미지와 이름을 연결하도록 프롬프트 뒤에 부가 (이름 있는 노드가 있을 때만)
     let finalPrompt = prompt
     const refCount = referenceFiles.length
@@ -130,6 +143,12 @@ function AppInner() {
     if (namedOrdered.length > 0) {
       const lines = namedOrdered.map((n, i) => `참조 이미지 ${i + 1}: "${(n.data.title || '').trim()}"`)
       finalPrompt = `${prompt}\n\n[참조 이미지 안내 — 입력 순서대로]\n${lines.join('\n')}`
+    }
+
+    // 펜 표시 안내: 펜이 그려진 노드가 있으면 — 전송된 참조는 펜이 없는 원본이며,
+    // 펜 위치(%)를 수정 대상 영역으로 안내. 펜 자국 재현 금지 지시 포함.
+    if (penNotes.length > 0) {
+      finalPrompt += `\n\n[수정 대상 영역 안내 — 펜 표시 기반]\n다음 영역이 사용자가 수정하기를 원하는 위치입니다 (이미지 기준 % 좌표):\n${penNotes.join('\n')}\n위 영역을 프롬프트 내용에 따라 수정하세요. 전송된 참조 이미지에는 펜이 없으므로 결과에 펜 자국을 포함하지 마세요.`
     }
 
     // create result node hooked to model output
@@ -159,7 +178,7 @@ function AppInner() {
       const r = await fetch('/api/generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ prompt: finalPrompt, referenceFiles, model: modelNode.data.model })
+        body: JSON.stringify({ prompt: finalPrompt, referenceFiles: transferFiles, model: modelNode.data.model })
       })
       const j = await r.json()
       if (j.ok) {

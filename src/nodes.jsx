@@ -49,18 +49,18 @@ export function ImageNode({ id, data, selected }) {
     reader.readAsDataURL(file)
   }, [id])
 
-  // 에디트 진입 시 배경(원본 이미지)을 캔버스에 로드
+  // 에디트 진입 시 캔버스는 "투명 펜 레이어"로 사용 — 원본 이미지(img) 위에 CSS로 겹쳐 표시됨.
+  // 원본을 캔버스에 그리지 않으므로, 커밋 시 펜 픽셀만 추출해 원본과 합성할 수 있고
+  // 모델 전송용 원본(data.originalFile)을 깨끗하게 보존할 수 있음.
   useEffect(() => {
-    if (!editMode || !data.url || !canvasRef.current) return
-    const img = new Image()
-    img.onload = () => {
-      const c = canvasRef.current
-      c.width = img.naturalWidth
-      c.height = img.naturalHeight
-      c.getContext('2d').drawImage(img, 0, 0)
-    }
-    img.src = data.url
-  }, [editMode, data.url])
+    if (!editMode || !canvasRef.current) return
+    const c = canvasRef.current
+    c.width = Math.round(1024)
+    c.height = Math.round(1024 / ratio)
+    const ctx = c.getContext('2d')
+    ctx.clearRect(0, 0, c.width, c.height)
+    setHasDraw(false)
+  }, [editMode, ratio])
 
   // 브러시 그리기
   const pos = (e) => {
@@ -102,10 +102,52 @@ export function ImageNode({ id, data, selected }) {
   }
 
   // 그린 내용을 새 이미지로 커밋 (합성)
+  // - 표시용: 원본+펜 합성 이미지 (노드 썸네일)
+  // - 데이터: data.originalFile(깨끗한 원본) + data.penBox(펜 영역, 0~1 정규화)를 함께 기록
+  //   → 모델 실행 시 원본이 전송되고 펜 위치는 프롬프트로 전달되어 펜 자국 재현이 구조적으로 차단됨
   const commitDraw = useCallback(async () => {
     const canvas = canvasRef.current
     if (!canvas || !hasDraw) { setEditMode(false); return }
-    const dataUrl = canvas.toDataURL('image/png')
+
+    // 펜 bbox 계산 (투명 레이어에서 alpha>0 픽셀)
+    const ctx = canvas.getContext('2d')
+    const { width: cw, height: ch } = canvas
+    const px = ctx.getImageData(0, 0, cw, ch).data
+    let minX = cw, minY = ch, maxX = -1, maxY = -1
+    for (let y = 0; y < ch; y++) {
+      for (let x = 0; x < cw; x++) {
+        if (px[(y * cw + x) * 4 + 3] > 0) {
+          if (x < minX) minX = x
+          if (x > maxX) maxX = x
+          if (y < minY) minY = y
+          if (y > maxY) maxY = y
+        }
+      }
+    }
+    if (maxX < 0) { setEditMode(false); return }
+    const penBox = {
+      x: minX / cw, y: minY / ch,
+      w: (maxX - minX + 1) / cw, h: (maxY - minY + 1) / ch
+    }
+
+    // 표시용 합성: 원본 이미지 + 펜 레이어
+    const origFile = data.file // 커밋 전 파일 = 원본 (모델 전송용으로 보존)
+    const compose = document.createElement('canvas')
+    compose.width = cw
+    compose.height = ch
+    const cx = compose.getContext('2d')
+    await new Promise((res) => {
+      const img = new Image()
+      img.onload = () => {
+        // cover 기준: 썸네일 img는 object-fit: contain으로 표시되지만, 합성은 원본 전체를 캔버스에 맞춤
+        cx.drawImage(img, 0, 0, compose.width, compose.height)
+        res()
+      }
+      img.src = data.url
+    })
+    cx.drawImage(canvas, 0, 0) // 펜 레이어 (원본 좌표계 그대로)
+
+    const dataUrl = compose.toDataURL('image/png')
     const r = await fetch('/api/upload', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -115,9 +157,11 @@ export function ImageNode({ id, data, selected }) {
     if (j.url) {
       setEditMode(false)
       setHasDraw(false)
-      window.dispatchEvent(new CustomEvent('nf:update-node', { detail: { id, patch: { file: j.file, url: j.url } } }))
+      window.dispatchEvent(new CustomEvent('nf:update-node', {
+        detail: { id, patch: { file: j.file, url: j.url, originalFile: origFile, penBox } }
+      }))
     }
-  }, [hasDraw, id])
+  }, [hasDraw, id, data.file, data.url])
 
   return (
     <div
