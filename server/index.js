@@ -2,7 +2,32 @@ import express from 'express'
 import fs from 'node:fs'
 import path from 'node:path'
 import crypto from 'node:crypto'
+import sharp from 'sharp'
 import { CURATED_MODELS } from './models.js'
+
+// 단색 테두리 자동 트림 — "생성된 이미지에 여백이 생기는" 문제 방어.
+// 모델 실패 생성물(워터마크/플레이스홀더)은 콘텐츠가 작은 띠 하나 + 광대한 단색 배경 형태다.
+// 판정: trim 후 종횡비 3:1 이상 극단이고, 잘린 쪽 변이 원본의 30% 미만이면 "실패 띠"로
+// 보고 트림 적용. 종횡비가 정상이면 여백이 디자인의 일부(로고·미니멀 구도)이므로 원본 유지.
+async function trimUniformBorder(buf, ext) {
+  try {
+    if (ext === 'svg') return buf
+    const meta = await sharp(buf).metadata()
+    const trimmed = await sharp(buf).trim({ threshold: 25 }).toBuffer({ resolveWithObject: true })
+    const { width: tw, height: th } = trimmed.info
+    if (tw < 8 || th < 8) return buf
+    const ratio = Math.max(tw, th) / Math.min(tw, th)
+    const origMin = Math.min(meta.width || tw, meta.height || th)
+    if (ratio >= 3 && Math.min(tw, th) < origMin * 0.3) {
+      console.log(`[trim] strip detected → ${tw}x${th}`)
+      return trimmed.data
+    }
+    return buf
+  } catch (e) {
+    console.error('[trim] failed, keeping original:', e.message)
+    return buf
+  }
+}
 
 const PORT = process.env.PORT || 7837
 const ROOT = path.resolve(process.cwd())
@@ -182,7 +207,9 @@ app.post('/api/generate', async (req, res) => {
       const media = item.media_type || 'image/png'
       const ext = media.includes('jpeg') ? 'jpg' : media.includes('webp') ? 'webp' : media.includes('svg') ? 'svg' : 'png'
       const id = crypto.randomUUID()
-      fs.writeFileSync(path.join(IMAGES_DIR, `${id}.${ext}`), Buffer.from(item.b64_json, 'base64'))
+      const raw = Buffer.from(item.b64_json, 'base64')
+      const buf = await trimUniformBorder(raw, ext)
+      fs.writeFileSync(path.join(IMAGES_DIR, `${id}.${ext}`), buf)
       addCost(j.usage?.cost) // 실제 청구액을 누적 비용에 반영
       return res.json({
         ok: true,
