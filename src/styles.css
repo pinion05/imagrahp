@@ -15,6 +15,12 @@
   --ok: #4ade80;
   --warn: #fbbf24;
   --err: #f87171;
+  /* React Flow v12 Controls 버튼 기본색(#fefefe·#f4f4f4) 오버라이드 — 라이브러리 CSS가 나중에 로드되어
+     동일 특이점 규칙을 덮어쓰는 문제를 변수로 차단 */
+  --xy-controls-button-background-color-default: #0a0a0a;
+  --xy-controls-button-background-color-hover-default: #1c1c1c;
+  --xy-controls-button-color-default: #888;
+  --xy-controls-button-color-hover-default: #fff;
   --font-sans: 'Inter', -apple-system, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 }
@@ -504,7 +510,8 @@ body {
   margin-bottom: 8px;
 }
 .react-flow__controls-button {
-  background: transparent;
+  /* React Flow v12 기본 버튼색(#fefefe)이 라이브러리 CSS에서 나중에 적용되어 덮어쓰는 문제 — 동일 특이점으로 이기기 */
+  background: rgba(10, 10, 10, 0.8);
   border-bottom: 1px solid var(--line-color);
   width: 26px; height: 26px;
 }
